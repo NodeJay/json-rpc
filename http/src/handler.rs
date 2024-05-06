@@ -8,6 +8,7 @@ use std::{fmt, mem, str};
 
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::{self, service::Service, Body, Method};
+use ::core::net::SocketAddr;
 
 use crate::jsonrpc::serde_json;
 use crate::jsonrpc::{self as core, middleware, Metadata, Middleware};
@@ -28,6 +29,7 @@ pub struct ServerHandler<M: Metadata = (), S: Middleware<M> = middleware::Noop> 
 	health_api: Option<(String, String)>,
 	max_request_body_size: usize,
 	keep_alive: bool,
+	client_addr: SocketAddr
 }
 
 impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
@@ -43,6 +45,7 @@ impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
 		health_api: Option<(String, String)>,
 		max_request_body_size: usize,
 		keep_alive: bool,
+		client_addr: SocketAddr
 	) -> Self {
 		ServerHandler {
 			jsonrpc_handler,
@@ -55,6 +58,7 @@ impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
 			health_api,
 			max_request_body_size,
 			keep_alive,
+			client_addr,
 		}
 	}
 }
@@ -75,7 +79,7 @@ where
 
 	fn call(&mut self, request: hyper::Request<Body>) -> Self::Future {
 		let is_host_allowed = utils::is_host_allowed(&request, &self.allowed_hosts);
-		let action = self.middleware.on_request(request);
+		let action = self.middleware.on_request(request, self.client_addr);
 
 		let (should_validate_hosts, should_continue_on_invalid_cors, response) = match action {
 			RequestMiddlewareAction::Proceed {
@@ -115,6 +119,7 @@ where
 					max_request_body_size: self.max_request_body_size,
 					// initial value, overwritten when reading client headers
 					keep_alive: true,
+					client_addr: self.client_addr
 				})
 			}
 		}
@@ -218,6 +223,7 @@ pub struct RpcHandler<M: Metadata, S: Middleware<M>> {
 	health_api: Option<(String, String)>,
 	max_request_body_size: usize,
 	keep_alive: bool,
+	client_addr: SocketAddr,
 }
 
 impl<M: Metadata, S: Middleware<M>> Future for RpcHandler<M, S>
@@ -301,6 +307,7 @@ where
 					cors_allow_origin.into(),
 					cors_allow_headers.into(),
 					this.keep_alive,
+					this.client_addr.clone(),
 				);
 				Poll::Ready(Ok(response))
 			}
@@ -343,13 +350,26 @@ where
 		if self.cors_allow_headers == cors::AllowCors::Invalid && !continue_on_invalid_cors {
 			return RpcHandlerState::Writing(Response::invalid_allow_headers());
 		}
+		//self.client_addr
 
 		// Read metadata
 		let handler = match self.jsonrpc_handler.upgrade() {
 			Some(handler) => handler,
 			None => return RpcHandlerState::Writing(Response::closing()),
 		};
+		/* 
+		let heady = HeaderValue::from_str(&self.client_addr.ip().to_string());
+		match heady {
+			Ok(a)=> {
+				request.headers().try_append("client-ip-address", a);
+			}
+			Err(a)=> {
+
+			}
+		}
+		*/
 		let metadata = handler.extractor.read_metadata(&request);
+		
 
 		// Proceed
 		match *request.method() {
@@ -529,6 +549,7 @@ where
 		cors_allow_origin: Option<HeaderValue>,
 		cors_allow_headers: Option<Vec<HeaderValue>>,
 		keep_alive: bool,
+		client_addr: SocketAddr
 	) {
 		let as_header = |m: Method| m.as_str().parse().expect("`Method` will always parse; qed");
 		let concat = |headers: &[HeaderValue]| {
@@ -542,6 +563,16 @@ where
 			HeaderValue::from_bytes(&val[..max_len])
 				.expect("Concatenation of valid headers with `, ` is still valid; qed")
 		};
+
+		let heady = HeaderValue::from_str(&client_addr.ip().to_string());
+		match heady {
+			Ok(a)=> {
+				headers.append("client-ip-address", a);
+			}
+			Err(a)=> {
+
+			}
+		}
 
 		let allowed = concat(&[as_header(Method::OPTIONS), as_header(Method::POST)]);
 

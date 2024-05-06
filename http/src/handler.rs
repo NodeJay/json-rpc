@@ -8,7 +8,8 @@ use std::{fmt, mem, str};
 
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::{self, service::Service, Body, Method};
-use ::core::net::SocketAddr;
+use std::net::SocketAddr;
+
 
 use crate::jsonrpc::serde_json;
 use crate::jsonrpc::{self as core, middleware, Metadata, Middleware};

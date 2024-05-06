@@ -107,22 +107,22 @@ impl From<hyper::Request<Body>> for RequestMiddlewareAction {
 /// Allows to intercept request and handle it differently.
 pub trait RequestMiddleware: Send + Sync + 'static {
 	/// Takes a request and decides how to proceed with it.
-	fn on_request(&self, request: hyper::Request<hyper::Body>, client_addr: SocketAddr) -> RequestMiddlewareAction;
+	fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction;
 }
 
 impl<F> RequestMiddleware for F
 where
-	F: Fn(hyper::Request<Body>, SocketAddr) -> RequestMiddlewareAction + Sync + Send + 'static,
+	F: Fn(hyper::Request<Body>) -> RequestMiddlewareAction + Sync + Send + 'static,
 {
-	fn on_request(&self, request: hyper::Request<hyper::Body>, client_addr: SocketAddr) -> RequestMiddlewareAction {
-		(*self)(request, client_addr)
+	fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
+		(*self)(request)
 	}
 }
 
 #[derive(Default)]
 struct NoopRequestMiddleware;
 impl RequestMiddleware for NoopRequestMiddleware {
-	fn on_request(&self, request: hyper::Request<Body>, client_addr: SocketAddr) -> RequestMiddlewareAction {
+	fn on_request(&self, request: hyper::Request<Body>) -> RequestMiddlewareAction {
 		RequestMiddlewareAction::Proceed {
 			should_continue_on_invalid_cors: false,
 			request,

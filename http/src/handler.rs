@@ -565,15 +565,7 @@ where
 				.expect("Concatenation of valid headers with `, ` is still valid; qed")
 		};
 
-		let heady = HeaderValue::from_str(&client_addr.ip().to_string());
-		match heady {
-			Ok(a)=> {
-				headers.append("client-ip-address", a);
-			}
-			Err(a)=> {
-
-			}
-		}
+		
 
 		let allowed = concat(&[as_header(Method::OPTIONS), as_header(Method::POST)]);
 

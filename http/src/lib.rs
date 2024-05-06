@@ -620,7 +620,7 @@ fn serve<M: jsonrpc::Metadata, S: jsonrpc::Middleware<M>>(
 				health_api.clone(),
 				max_request_body_size,
 				keep_alive,
-				client,
+				//client,
 			);
 			async { Ok::<_, Infallible>(service) }
 		});

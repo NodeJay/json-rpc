@@ -107,22 +107,22 @@ impl From<hyper::Request<Body>> for RequestMiddlewareAction {
 /// Allows to intercept request and handle it differently.
 pub trait RequestMiddleware: Send + Sync + 'static {
 	/// Takes a request and decides how to proceed with it.
-	fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction;
+	fn on_request(&self, request: hyper::Request<hyper::Body>, client_addr: SocketAddr) -> RequestMiddlewareAction;
 }
 
 impl<F> RequestMiddleware for F
 where
-	F: Fn(hyper::Request<Body>) -> RequestMiddlewareAction + Sync + Send + 'static,
+	F: Fn(hyper::Request<Body>, SocketAddr) -> RequestMiddlewareAction + Sync + Send + 'static,
 {
-	fn on_request(&self, request: hyper::Request<hyper::Body>) -> RequestMiddlewareAction {
-		(*self)(request)
+	fn on_request(&self, request: hyper::Request<hyper::Body>, client_addr: SocketAddr) -> RequestMiddlewareAction {
+		(*self)(request, client_addr)
 	}
 }
 
 #[derive(Default)]
 struct NoopRequestMiddleware;
 impl RequestMiddleware for NoopRequestMiddleware {
-	fn on_request(&self, request: hyper::Request<Body>) -> RequestMiddlewareAction {
+	fn on_request(&self, request: hyper::Request<Body>, client_addr: SocketAddr) -> RequestMiddlewareAction {
 		RequestMiddlewareAction::Proceed {
 			should_continue_on_invalid_cors: false,
 			request,
@@ -620,7 +620,7 @@ fn serve<M: jsonrpc::Metadata, S: jsonrpc::Middleware<M>>(
 				health_api.clone(),
 				max_request_body_size,
 				keep_alive,
-				//client,
+				client,
 			);
 			async { Ok::<_, Infallible>(service) }
 		});
